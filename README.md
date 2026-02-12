@@ -258,3 +258,9 @@ If ports are in use:
 ## License
 
 MIT License - Hackathon Project
+        
+## Documentation
+
+- [Task Checklist](docs/task.md)
+- [Implementation Plan](docs/implementation_plan.md)
+- [Walkthrough & Verification](docs/walkthrough.md)
