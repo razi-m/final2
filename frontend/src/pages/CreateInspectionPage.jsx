@@ -8,8 +8,7 @@ function CreateInspectionPage() {
   const [description, setDescription] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
-  // Add dummy fields for visual match
-  const [supervisor, setSupervisor] = useState('Austin / Inspector')
+  const [supervisor, setSupervisor] = useState('')
   const [date, setDate] = useState(new Date().toISOString().split('T')[0])
 
   const navigate = useNavigate()
@@ -20,9 +19,6 @@ function CreateInspectionPage() {
     setError('')
 
     try {
-      // Map visual fields to backend fields
-      // Title -> Mission Name
-      // Description -> Destination + Supervisor
       const backendDescription = `Destination: ${description}. Supervisor: ${supervisor}`
       const response = await inspectionsAPI.create({ title, description: backendDescription })
       navigate(`/inspections/${response.data.id}`)
@@ -38,21 +34,26 @@ function CreateInspectionPage() {
         <h1 className="page-title">Processing Queue</h1>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '2rem' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(300px, 1fr) 1fr', gap: '2rem' }}>
         {/* Left: Drag & Drop Area */}
-        <div className="card" style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
-          <h3 className="detail-section-title">Upload Media</h3>
-          <div className="video-upload-zone" style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', borderStyle: 'dashed' }}>
-            <div style={{ fontSize: '3rem', marginBottom: '1rem', opacity: 0.7 }}>☁️</div>
-            <h2 style={{ fontSize: '1.5rem', marginBottom: '0.5rem' }}>Drag & Drop Video Upload</h2>
-            <p style={{ color: 'var(--text-secondary)' }}>Accepted file types: MP4 / MOV</p>
+        <div className="card" style={{ display: 'flex', flexDirection: 'column', height: '100%', justifyContent: 'center', alignItems: 'center', borderStyle: 'dashed', borderWidth: '2px', padding: '3rem' }}>
+          <div style={{
+            width: '80px', height: '80px', borderRadius: '50%',
+            background: 'rgba(59, 130, 246, 0.1)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            fontSize: '2.5rem', marginBottom: '1.5rem', color: 'var(--accent-secondary)'
+          }}>
+            ☁️
           </div>
-          <button className="btn btn-primary" style={{ marginTop: '1.5rem', width: '100%' }} onClick={() => document.getElementById('submit-btn').click()}>
+          <h2 style={{ fontSize: '1.5rem', marginBottom: '0.5rem' }}>Drag & Drop Video Upload</h2>
+          <p style={{ color: 'var(--text-secondary)', marginBottom: '2rem' }}>Accepted file types: MP4 / MOV</p>
+
+          <button className="btn btn-primary" style={{ padding: '0.8rem 2rem', fontSize: '1rem' }} onClick={() => document.getElementById('submit-btn').click()}>
             Start AI Analysis
           </button>
         </div>
 
-        {/* Right: Mideo Dasview Paned (Form) */}
+        {/* Right: Mission Form (Mideo Dasview Paned) */}
         <div className="card">
           <h3 className="detail-section-title">Mission Dashboard Panel</h3>
 
@@ -60,49 +61,58 @@ function CreateInspectionPage() {
 
           <form onSubmit={handleSubmit}>
             <div className="form-group">
-              <label className="form-label">Mission Name</label>
+              <label className="form-label" style={{ color: 'var(--text-secondary)' }}>Mission Name</label>
               <input
                 type="text"
-                className="form-input"
+                className="input-glass"
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
-                placeholder="Ex. Bridge Inspection 001"
+                placeholder="Location"
                 required
               />
             </div>
 
             <div className="form-group">
-              <label className="form-label">Destination</label>
-              <input
-                type="text"
-                className="form-input"
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
-                placeholder="Ex. Austin / Sector 4"
-              />
+              <label className="form-label" style={{ color: 'var(--text-secondary)' }}>Destination</label>
+              <div style={{ position: 'relative' }}>
+                <input
+                  type="text"
+                  className="input-glass"
+                  value={description}
+                  onChange={(e) => setDescription(e.target.value)}
+                  placeholder="Austin / Sector 4"
+                />
+                <span style={{ position: 'absolute', right: '10px', top: '10px', opacity: 0.5 }}>📍</span>
+              </div>
             </div>
 
             <div className="form-group">
-              <label className="form-label">Supervisor / Department</label>
-              <input
-                type="text"
-                className="form-input"
-                value={supervisor}
-                onChange={(e) => setSupervisor(e.target.value)}
-              />
+              <label className="form-label" style={{ color: 'var(--text-secondary)' }}>Department / Supervisor</label>
+              <div style={{ position: 'relative' }}>
+                <input
+                  type="text"
+                  className="input-glass"
+                  value={supervisor}
+                  onChange={(e) => setSupervisor(e.target.value)}
+                  placeholder="Engineering / Resp. Officer"
+                />
+                <span style={{ position: 'absolute', right: '10px', top: '10px', opacity: 0.5 }}>🏢</span>
+              </div>
             </div>
 
             <div className="form-group">
-              <label className="form-label">Date/Time</label>
-              <input
-                type="date"
-                className="form-input"
-                value={date}
-                onChange={(e) => setDate(e.target.value)}
-              />
+              <label className="form-label" style={{ color: 'var(--text-secondary)' }}>Date/Time</label>
+              <div style={{ position: 'relative' }}>
+                <input
+                  type="date"
+                  className="input-glass"
+                  value={date}
+                  onChange={(e) => setDate(e.target.value)}
+                />
+                <span style={{ position: 'absolute', right: '10px', top: '10px', opacity: 0.5 }}>📅</span>
+              </div>
             </div>
 
-            {/* Hidden submit button triggered by the main button */}
             <button id="submit-btn" type="submit" style={{ display: 'none' }}></button>
           </form>
         </div>
