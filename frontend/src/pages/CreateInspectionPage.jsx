@@ -8,6 +8,10 @@ function CreateInspectionPage() {
   const [description, setDescription] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+  // Add dummy fields for visual match
+  const [supervisor, setSupervisor] = useState('Austin / Inspector')
+  const [date, setDate] = useState(new Date().toISOString().split('T')[0])
+
   const navigate = useNavigate()
 
   const handleSubmit = async (e) => {
@@ -16,7 +20,11 @@ function CreateInspectionPage() {
     setError('')
 
     try {
-      const response = await inspectionsAPI.create({ title, description })
+      // Map visual fields to backend fields
+      // Title -> Mission Name
+      // Description -> Destination + Supervisor
+      const backendDescription = `Destination: ${description}. Supervisor: ${supervisor}`
+      const response = await inspectionsAPI.create({ title, description: backendDescription })
       navigate(`/inspections/${response.data.id}`)
     } catch (err) {
       setError('Failed to create inspection')
@@ -25,68 +33,82 @@ function CreateInspectionPage() {
   }
 
   return (
-    <div>
+    <div className="processing-queue-page">
       <div className="page-header">
-        <h1 className="page-title">Create New Inspection</h1>
+        <h1 className="page-title">Processing Queue</h1>
       </div>
 
-      {loading && <LoadingOverlay message="Creating inspection..." />}
-
-      <div className="card" style={{ maxWidth: '800px' }}>
-        {error && (
-          <div style={{ 
-            background: 'rgba(239, 68, 68, 0.2)', 
-            color: '#FCA5A5', 
-            padding: '0.75rem', 
-            borderRadius: '8px',
-            marginBottom: '1rem'
-          }}>
-            {error}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '2rem' }}>
+        {/* Left: Drag & Drop Area */}
+        <div className="card" style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+          <h3 className="detail-section-title">Upload Media</h3>
+          <div className="video-upload-zone" style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', borderStyle: 'dashed' }}>
+            <div style={{ fontSize: '3rem', marginBottom: '1rem', opacity: 0.7 }}>☁️</div>
+            <h2 style={{ fontSize: '1.5rem', marginBottom: '0.5rem' }}>Drag & Drop Video Upload</h2>
+            <p style={{ color: 'var(--text-secondary)' }}>Accepted file types: MP4 / MOV</p>
           </div>
-        )}
+          <button className="btn btn-primary" style={{ marginTop: '1.5rem', width: '100%' }} onClick={() => document.getElementById('submit-btn').click()}>
+            Start AI Analysis
+          </button>
+        </div>
 
-        <form onSubmit={handleSubmit}>
-          <div className="form-group">
-            <label className="form-label">Title</label>
-            <input
-              type="text"
-              className="form-input"
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              placeholder="Enter inspection title"
-              required
-            />
-          </div>
+        {/* Right: Mideo Dasview Paned (Form) */}
+        <div className="card">
+          <h3 className="detail-section-title">Mission Dashboard Panel</h3>
 
-          <div className="form-group">
-            <label className="form-label">Description</label>
-            <textarea
-              className="form-input"
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              placeholder="Enter inspection description"
-              rows={4}
-            />
-          </div>
+          {error && <div style={{ color: 'var(--error)', marginBottom: '1rem' }}>{error}</div>}
 
-          <div style={{ display: 'flex', gap: '1rem' }}>
-            <button 
-              type="button" 
-              className="btn btn-secondary"
-              onClick={() => navigate('/')}
-            >
-              Cancel
-            </button>
-            <button 
-              type="submit" 
-              className="btn btn-primary"
-              disabled={loading}
-            >
-              Create Inspection
-            </button>
-          </div>
-        </form>
+          <form onSubmit={handleSubmit}>
+            <div className="form-group">
+              <label className="form-label">Mission Name</label>
+              <input
+                type="text"
+                className="form-input"
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+                placeholder="Ex. Bridge Inspection 001"
+                required
+              />
+            </div>
+
+            <div className="form-group">
+              <label className="form-label">Destination</label>
+              <input
+                type="text"
+                className="form-input"
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                placeholder="Ex. Austin / Sector 4"
+              />
+            </div>
+
+            <div className="form-group">
+              <label className="form-label">Supervisor / Department</label>
+              <input
+                type="text"
+                className="form-input"
+                value={supervisor}
+                onChange={(e) => setSupervisor(e.target.value)}
+              />
+            </div>
+
+            <div className="form-group">
+              <label className="form-label">Date/Time</label>
+              <input
+                type="date"
+                className="form-input"
+                value={date}
+                onChange={(e) => setDate(e.target.value)}
+              />
+            </div>
+
+            {/* Hidden submit button triggered by the main button */}
+            <button id="submit-btn" type="submit" style={{ display: 'none' }}></button>
+          </form>
+        </div>
       </div>
+
+      {loading && <LoadingOverlay message="Initializing Mission..." />}
     </div>
   )
 }

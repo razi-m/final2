@@ -13,10 +13,18 @@ function InspectionDetailPage() {
   const [actionLoading, setActionLoading] = useState(false)
   const [error, setError] = useState('')
   const [selectedFile, setSelectedFile] = useState(null)
+  const [activeDefect, setActiveDefect] = useState(null) // To show in "Defect Detail" panel
 
   useEffect(() => {
     fetchInspection()
   }, [id])
+
+  // Select first defect when inspection loads
+  useEffect(() => {
+    if (inspection?.defects?.length > 0 && !activeDefect) {
+      setActiveDefect(inspection.defects[0])
+    }
+  }, [inspection])
 
   const fetchInspection = async () => {
     try {
@@ -35,16 +43,14 @@ function InspectionDetailPage() {
 
   const handleUpload = async () => {
     if (!selectedFile) return
-    
     setActionLoading(true)
     setError('')
-    
     try {
       await inspectionsAPI.uploadVideo(id, selectedFile)
       await fetchInspection()
       setSelectedFile(null)
     } catch (err) {
-      setError(err.response?.data?.detail || 'Failed to upload video')
+      setError('Failed to upload video')
     } finally {
       setActionLoading(false)
     }
@@ -53,12 +59,11 @@ function InspectionDetailPage() {
   const handleAnalyze = async () => {
     setActionLoading(true)
     setError('')
-    
     try {
       await inspectionsAPI.analyze(id)
       await fetchInspection()
     } catch (err) {
-      setError(err.response?.data?.detail || 'Analysis failed')
+      setError('Analysis failed')
     } finally {
       setActionLoading(false)
     }
@@ -67,12 +72,11 @@ function InspectionDetailPage() {
   const handleApprove = async () => {
     setActionLoading(true)
     setError('')
-    
     try {
       await inspectionsAPI.approve(id)
       await fetchInspection()
     } catch (err) {
-      setError(err.response?.data?.detail || 'Approval failed')
+      setError('Approval failed')
     } finally {
       setActionLoading(false)
     }
@@ -89,7 +93,6 @@ function InspectionDetailPage() {
       document.body.appendChild(link)
       link.click()
       document.body.removeChild(link)
-      window.URL.revokeObjectURL(url)
     } catch (err) {
       setError('Failed to download report')
     }
@@ -99,179 +102,161 @@ function InspectionDetailPage() {
   if (!inspection) return <div>Inspection not found</div>
 
   return (
-    <div>
-      {actionLoading && <LoadingOverlay />}
+    <div className="review-panel-page">
+      {actionLoading && <LoadingOverlay message="Processing..." />}
 
       <div className="page-header">
-        <div>
-          <h1 className="page-title">{inspection.title}</h1>
-          <p style={{ color: 'var(--text-secondary)', marginTop: '0.5rem' }}>
-            {inspection.description || 'No description'}
-          </p>
+        <h1 className="page-title">Video + Frame Review Panel</h1>
+
+        <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
+          <div className="status-badge" style={{ background: 'rgba(255,255,255,0.1)', color: 'white' }}>
+            Mission: {inspection.title}
+          </div>
+          <StatusBadge status={inspection.status} />
+          {inspection.status === 'approved' && (
+            <button className="btn btn-primary" onClick={handleDownloadReport}>Download PDF Report</button>
+          )}
         </div>
-        <StatusBadge status={inspection.status} />
       </div>
 
-      {error && (
-        <div style={{ 
-          background: 'rgba(239, 68, 68, 0.2)', 
-          color: '#FCA5A5', 
-          padding: '1rem', 
-          borderRadius: '8px',
-          marginBottom: '1rem'
-        }}>
-          {error}
-        </div>
-      )}
+      <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '2rem' }}>
 
-      <div className="detail-grid">
-        <div>
-          {/* Video Upload Section */}
+        {/* LEFT: Video Player / Main Visual */}
+        <div className="card" style={{ minHeight: '400px', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+
+          {/* State: Upload Needed */}
           {inspection.status === 'created' && (
-            <div className="card detail-section">
-              <h3 className="detail-section-title">Upload Video</h3>
-              <div className="video-upload-zone">
-                <input
-                  type="file"
-                  accept="video/*"
-                  onChange={handleFileSelect}
-                  id="video-input"
-                  style={{ display: 'none' }}
-                />
-                <label htmlFor="video-input" style={{ cursor: 'pointer' }}>
-                  <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>🎥</div>
-                  <p>{selectedFile ? selectedFile.name : 'Click to select video file'}</p>
-                </label>
-              </div>
-              {selectedFile && (
-                <button 
-                  className="btn btn-primary" 
-                  style={{ width: '100%', marginTop: '1rem' }}
-                  onClick={handleUpload}
-                >
+            <div className="video-upload-zone" style={{ borderStyle: 'dashed', textAlign: 'center', padding: '4rem' }}>
+              <h3>Upload Mission Footage</h3>
+              <input type="file" onChange={handleFileSelect} style={{ marginTop: '1rem' }} accept="video/*" />
+              <div style={{ marginTop: '1rem' }}>
+                <button className="btn btn-primary" onClick={handleUpload} disabled={!selectedFile}>
                   Upload Video
                 </button>
+              </div>
+            </div>
+          )}
+
+          {/* State: Ready for Analysis */}
+          {inspection.status === 'video_uploaded' && (
+            <div style={{ textAlign: 'center' }}>
+              <div style={{ fontSize: '4rem' }}>🎬</div>
+              <h3>Footage Loaded</h3>
+              <p style={{ color: 'var(--text-secondary)' }}>Ready for AI Analysis</p>
+              <button className="btn btn-primary" onClick={handleAnalyze} style={{ marginTop: '1rem' }}>
+                Start AI Analysis
+              </button>
+            </div>
+          )}
+
+          {/* State: Analyzing */}
+          {inspection.status === 'analyzing' && (
+            <div style={{ textAlign: 'center' }}>
+              <div className="spinner"></div>
+              <h3>Processing video with AI...</h3>
+              <p>Please wait.</p>
+            </div>
+          )}
+
+          {/* State: Completed / Approved */}
+          {(inspection.status === 'analysis_completed' || inspection.status === 'approved') && (
+            <div style={{ position: 'relative', height: '100%', background: 'black', borderRadius: '8px', overflow: 'hidden' }}>
+              {/* Mock Video Player visuals */}
+              <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', color: 'rgba(255,255,255,0.2)', fontSize: '5rem' }}>▶</div>
+              <div style={{ position: 'absolute', bottom: '20px', left: '20px', right: '20px' }}>
+                <div style={{ height: '4px', background: 'rgba(255,255,255,0.3)', borderRadius: '2px' }}>
+                  <div style={{ width: '60%', height: '100%', background: 'var(--accent-primary)' }}></div>
+                </div>
+              </div>
+              {/* Detected Boxes Overlay (Simulated) */}
+              {activeDefect && (
+                <div style={{
+                  position: 'absolute',
+                  top: '30%', left: '40%',
+                  width: '100px', height: '100px',
+                  border: '2px solid red',
+                  boxShadow: '0 0 10px red'
+                }}>
+                  <div style={{ background: 'red', color: 'white', fontSize: '10px', padding: '2px', position: 'absolute', top: '-15px' }}>
+                    {activeDefect.defect_type} {(activeDefect.confidence * 100).toFixed(0)}%
+                  </div>
+                </div>
               )}
             </div>
           )}
-
-          {/* Analysis Section */}
-          {inspection.status === 'video_uploaded' && (
-            <div className="card detail-section">
-              <h3 className="detail-section-title">Run Analysis</h3>
-              <p style={{ color: 'var(--text-secondary)', marginBottom: '1rem' }}>
-                Video uploaded successfully. Start AI analysis to detect defects.
-              </p>
-              <button 
-                className="btn btn-primary" 
-                onClick={handleAnalyze}
-              >
-                Start Analysis
-              </button>
-            </div>
-          )}
-
-          {inspection.status === 'analyzing' && (
-            <div className="card detail-section">
-              <h3 className="detail-section-title">Analysis in Progress</h3>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-                <div className="spinner" style={{ width: '24px', height: '24px' }}></div>
-                <span>Analyzing video frames...</span>
-              </div>
-            </div>
-          )}
-
-          {/* Approval Section */}
-          {inspection.status === 'analysis_completed' && (
-            <div className="card detail-section">
-              <h3 className="detail-section-title">Review & Approve</h3>
-              <p style={{ color: 'var(--text-secondary)', marginBottom: '1rem' }}>
-                Analysis complete. Review defects and approve to generate report.
-              </p>
-              <button 
-                className="btn btn-primary" 
-                onClick={handleApprove}
-              >
-                Approve & Generate Report
-              </button>
-            </div>
-          )}
-
-          {inspection.status === 'approved' && inspection.report && (
-            <div className="card detail-section">
-              <h3 className="detail-section-title">Report Generated</h3>
-              <button 
-                className="btn btn-primary" 
-                onClick={handleDownloadReport}
-              >
-                Download PDF Report
-              </button>
-            </div>
-          )}
         </div>
 
-        <div>
-          {/* Defects Section */}
-          <div className="card detail-section">
-            <h3 className="detail-section-title">
-              Detected Defects ({inspection.defects?.length || 0})
-            </h3>
-            
-            {inspection.defects?.length === 0 && (
-              <p style={{ color: 'var(--text-muted)' }}>
-                {inspection.status === 'analysis_completed' || inspection.status === 'approved' 
-                  ? 'No defects detected in this inspection.' 
-                  : 'Defects will appear here after analysis.'}
-              </p>
+        {/* RIGHT: Defect Detail Panel */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+
+          {/* Defect Detail Box */}
+          <div className="card">
+            <h3 className="detail-section-title">Defect Detail</h3>
+
+            {activeDefect ? (
+              <div style={{ background: 'rgba(255,255,255,0.05)', padding: '1rem', borderRadius: '8px' }}>
+                <div style={{ marginBottom: '1rem' }}>
+                  <label style={{ color: 'var(--text-secondary)', fontSize: '0.8rem' }}>Type</label>
+                  <div style={{ fontSize: '1.1rem', fontWeight: 'bold' }}>{activeDefect.defect_type}</div>
+                </div>
+                <div style={{ marginBottom: '1rem' }}>
+                  <label style={{ color: 'var(--text-secondary)', fontSize: '0.8rem' }}>Severity</label>
+                  <div style={{ color: activeDefect.confidence > 0.8 ? 'var(--error)' : 'var(--warning)' }}>
+                    {activeDefect.confidence > 0.8 ? 'High' : 'Medium'}
+                  </div>
+                </div>
+                <div style={{ marginBottom: '1rem' }}>
+                  <label style={{ color: 'var(--text-secondary)', fontSize: '0.8rem' }}>Confidence</label>
+                  <div>{(activeDefect.confidence * 100).toFixed(1)}%</div>
+                </div>
+                <div>
+                  <label style={{ color: 'var(--text-secondary)', fontSize: '0.8rem' }}>Suggested Action</label>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                    <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: 'var(--accent-primary)' }}></div>
+                    Fast Patch Repair
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div style={{ color: 'var(--text-muted)', textAlign: 'center', padding: '2rem' }}>
+                No defect selected or none detected.
+              </div>
             )}
 
-            <div className="defect-list">
-              {inspection.defects?.map((defect, index) => (
-                <div key={index} className="defect-item">
-                  <div>
-                    <DefectBadge defectType={defect.defect_type} />
-                    <span style={{ marginLeft: '0.75rem', color: 'var(--text-muted)' }}>
-                      Frame {defect.frame_number}
-                    </span>
-                  </div>
-                  <span style={{ color: 'var(--accent-primary)', fontWeight: 600 }}>
-                    {(defect.confidence * 100).toFixed(1)}%
-                  </span>
+            {inspection.status === 'analysis_completed' && (
+              <button className="btn btn-primary" style={{ width: '100%', marginTop: '1.5rem' }} onClick={handleApprove}>
+                Generate PDF Report
+              </button>
+            )}
+          </div>
+
+          {/* List of other defects */}
+          <div className="card" style={{ flex: 1 }}>
+            <h3 className="detail-section-title">Detection History</h3>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', maxHeight: '300px', overflowY: 'auto' }}>
+              {inspection.defects?.map((defect, i) => (
+                <div
+                  key={i}
+                  onClick={() => setActiveDefect(defect)}
+                  style={{
+                    padding: '0.75rem',
+                    borderRadius: '8px',
+                    background: activeDefect === defect ? 'rgba(0, 229, 255, 0.1)' : 'rgba(255,255,255,0.03)',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    justifyContent: 'space-between'
+                  }}
+                >
+                  <span>{defect.defect_type}</span>
+                  <span style={{ color: 'var(--text-secondary)' }}>Frame {defect.frame_number}</span>
                 </div>
               ))}
             </div>
           </div>
 
-          {/* Metadata */}
-          <div className="card detail-section">
-            <h3 className="detail-section-title">Details</h3>
-            <div style={{ display: 'grid', gap: '0.75rem' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                <span style={{ color: 'var(--text-muted)' }}>Created</span>
-                <span>{new Date(inspection.created_at).toLocaleString()}</span>
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                <span style={{ color: 'var(--text-muted)' }}>Updated</span>
-                <span>{inspection.updated_at ? new Date(inspection.updated_at).toLocaleString() : 'N/A'}</span>
-              </div>
-              {inspection.video_path && (
-                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                  <span style={{ color: 'var(--text-muted)' }}>Video</span>
-                  <span style={{ color: 'var(--success)' }}>✓ Uploaded</span>
-                </div>
-              )}
-            </div>
-          </div>
         </div>
-      </div>
 
-      <button 
-        className="btn btn-secondary" 
-        onClick={() => navigate('/')}
-        style={{ marginTop: '2rem' }}
-      >
-        ← Back to Dashboard
-      </button>
+      </div>
     </div>
   )
 }
