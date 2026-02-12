@@ -49,6 +49,21 @@ Default `httpx.AsyncClient()` uses 5s timeout — far too short for video frame 
 | List Inspections | `GET /api/inspections` | ✅ 200, returns inspection list |
 | CORS Preflight | `OPTIONS /api/login` | ✅ 200 |
 
-### Browser Testing
 
-⚠️ Browser automation tool unavailable (Playwright `$HOME` env var not set). Frontend needs manual verification at `http://localhost:5173`.
+        
+## Frontend Redesign
+
+Moved from standard navbar layout to a strict grid-based 6-part dashboard design as requested.
+
+### Key Features Implemented:
+1. **Sidebar Navigation**: Left-aligned, collapsible, with 6 key items (Home, Authority Login, Queue, Review, Defect Table, Admin).
+2. **Visual Theme**: Deep Navy (`#020617`), Slate (`#0F172A`), Cyan (`#00E5FF`) accents, glassmorphism UI.
+3. **Hero Section**: Dedicated "Drone in City" landing page with integrated Authority Login panel.
+4. **Processing Queue**: Updated "Create Inspection" flow with "Drag & Drop" visuals.
+5. **Review Panel**: Split view (Video Left, Defect Detail Right) for analyzing footage.
+6. **New Pages**: Added `AdminPage.jsx` and `DefectsPage.jsx`.
+
+### Verification Status
+- Component code created and integrated.
+- Imports verified statically.
+- Browser visual verification skipped due to environment limitations. Code is pushed for local testing.
