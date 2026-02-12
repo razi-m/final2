@@ -51,19 +51,33 @@ Default `httpx.AsyncClient()` uses 5s timeout — far too short for video frame 
 
 
         
-## Frontend Redesign
+
+## Frontend Redesign & Polish
 
 Moved from standard navbar layout to a strict grid-based 6-part dashboard design as requested.
 
 ### Key Features Implemented:
 1. **Sidebar Navigation**: Left-aligned, collapsible, with 6 key items (Home, Authority Login, Queue, Review, Defect Table, Admin).
 2. **Visual Theme**: Deep Navy (`#020617`), Slate (`#0F172A`), Cyan (`#00E5FF`) accents, glassmorphism UI.
-3. **Hero Section**: Dedicated "Drone in City" landing page with integrated Authority Login panel.
+3. **Hero Landing Page (Professional)**: 
+    - Full-screen cinematic layout with "Hero" text and "Authority Login" split view.
+    - Glassmorphism card for login (`backdrop-filter: blur(16px)`).
+    - Floating animated stats tiles (`animate-float`).
+    - Fade-in animations for all elements.
 4. **Processing Queue**: Updated "Create Inspection" flow with "Drag & Drop" visuals.
 5. **Review Panel**: Split view (Video Left, Defect Detail Right) for analyzing footage.
 6. **New Pages**: Added `AdminPage.jsx` and `DefectsPage.jsx`.
+
 
 ### Verification Status
 - Component code created and integrated.
 - Imports verified statically.
 - Browser visual verification skipped due to environment limitations. Code is pushed for local testing.
+
+## Post-Launch Updates
+- **API Key Update**: Updated backend `.env` with new Gemini API key.
+- **PDF Report Generation Fix**:
+    - Allowed retrying report generation even if inspection is already "approved".
+    - Added **"Regenerate Report ↻"** button in **Review Panel** specifically for inspections where initial generation failed.
+    - **Usage**: Go to Review Panel -> Click "Regenerate Report" -> Wait for completion -> Click "Download PDF Report".
+
