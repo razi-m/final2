@@ -19,9 +19,10 @@ async def lifespan(app: FastAPI):
 
     # Optionally bootstrap an admin account from the environment. We never ship
     # a hardcoded default password — the operator must supply ADMIN_PASSWORD.
-    admin_password = os.getenv("ADMIN_PASSWORD")
+    from app.config import settings as _s
+    admin_password = _s.ADMIN_PASSWORD
     if admin_password:
-        admin_username = os.getenv("ADMIN_USERNAME", "admin")
+        admin_username = _s.ADMIN_USERNAME
         db = SessionLocal()
         try:
             admin = db.query(User).filter(User.username == admin_username).first()
@@ -45,9 +46,8 @@ app = FastAPI(title="ARIADOS Backend", lifespan=lifespan)
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
-# Allow origins from env so prod and local both work without code changes.
-_raw_origins = os.getenv("ALLOWED_ORIGINS", "http://localhost:5173")
-allowed_origins = [o.strip() for o in _raw_origins.split(",") if o.strip()]
+from app.config import settings as _cfg
+allowed_origins = [o.strip() for o in _cfg.ALLOWED_ORIGINS.split(",") if o.strip()]
 
 app.add_middleware(
     CORSMiddleware,
