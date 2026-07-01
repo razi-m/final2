@@ -22,7 +22,10 @@ def _get_owned_inspection(inspection_id: int, db: Session, current_user: UserMod
         raise HTTPException(status_code=403, detail="Not authorized to access this inspection")
     return inspection
 
-UPLOAD_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "uploads")
+# /tmp is the only writable path on Vercel serverless. Fall back to a local
+# uploads/ directory when running outside serverless (local dev).
+_local_upload = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "uploads")
+UPLOAD_DIR = os.getenv("UPLOAD_DIR", "/tmp/ariados_uploads" if os.path.exists("/tmp") and not os.access(_local_upload, os.W_OK | os.X_OK) else _local_upload)
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 
 # Only allow known-safe video container extensions for uploads.
@@ -270,7 +273,8 @@ Please provide:
             # emit a blank spacer line instead.
             pdf.multi_cell(0, 8, _latin1(line) if line else " ")
         
-        reports_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "reports")
+        _local_reports = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "reports")
+        reports_dir = os.getenv("REPORTS_DIR", "/tmp/ariados_reports" if os.path.exists("/tmp") and not os.access(_local_reports, os.W_OK | os.X_OK) else _local_reports)
         os.makedirs(reports_dir, exist_ok=True)
         pdf_path = os.path.join(reports_dir, f"report_{inspection_id}.pdf")
         pdf.output(pdf_path)
