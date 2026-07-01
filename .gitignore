@@ -9,6 +9,9 @@ reports/
 *.db
 *.sqlite
 *.sqlite3
+*.zip
+logs_*.txt
+scripts/
 __pycache__/
 *.pyc
 *.pyo
