@@ -64,12 +64,13 @@ const LoginPage = memo(() => {
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1.5">Username</label>
               <div className="relative">
-                <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none z-10" />
                 <input
                   type="text"
                   value={username}
                   onChange={e => setUsername(e.target.value)}
-                  className="input-clean pl-10"
+                  className="input-clean"
+                  style={{ paddingLeft: '2.5rem' }}
                   placeholder="Enter username"
                 />
               </div>
@@ -77,12 +78,13 @@ const LoginPage = memo(() => {
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1.5">Password</label>
               <div className="relative">
-                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none z-10" />
                 <input
                   type={showPassword ? 'text' : 'password'}
                   value={password}
                   onChange={e => setPassword(e.target.value)}
-                  className="input-clean pl-10 pr-10"
+                  className="input-clean"
+                  style={{ paddingLeft: '2.5rem', paddingRight: '2.5rem' }}
                   placeholder="Enter password"
                 />
                 <button
