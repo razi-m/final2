@@ -1,3 +1,4 @@
+import os
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
@@ -9,23 +10,28 @@ from app.routers import auth, inspections, reports
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     Base.metadata.create_all(bind=engine)
-    
-    db = SessionLocal()
-    try:
-        admin = db.query(User).filter(User.username == "admin").first()
-        if not admin:
-            admin_user = User()
-            admin_user.username = "admin"
-            admin_user.hashed_password = get_password_hash("admin123")
-            admin_user.role = "admin"
-            db.add(admin_user)
-            db.commit()
-            print("Default admin user created")
-    finally:
-        db.close()
-    
+
+    # Optionally bootstrap an admin account from the environment. We never ship
+    # a hardcoded default password — the operator must supply ADMIN_PASSWORD.
+    admin_password = os.getenv("ADMIN_PASSWORD")
+    if admin_password:
+        admin_username = os.getenv("ADMIN_USERNAME", "admin")
+        db = SessionLocal()
+        try:
+            admin = db.query(User).filter(User.username == admin_username).first()
+            if not admin:
+                admin_user = User()
+                admin_user.username = admin_username
+                admin_user.hashed_password = get_password_hash(admin_password)
+                admin_user.role = "admin"
+                db.add(admin_user)
+                db.commit()
+                print(f"Admin user '{admin_username}' created from environment")
+        finally:
+            db.close()
+
     yield
-    
+
     print("Shutting down...")
 
 app = FastAPI(title="HackSav Backend", lifespan=lifespan)

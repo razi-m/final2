@@ -6,6 +6,9 @@ HackSav/
 .env.*.local
 uploads/
 reports/
+*.db
+*.sqlite
+*.sqlite3
 __pycache__/
 *.pyc
 *.pyo

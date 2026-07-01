@@ -3,8 +3,8 @@ from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 import os
 from app.database import get_db
-from app.models import Report
-from app.auth import get_current_user
+from app.models import Report, Inspection, User
+from app.auth import get_current_user_obj
 
 router = APIRouter()
 
@@ -12,10 +12,16 @@ router = APIRouter()
 def download_report(
     inspection_id: int,
     db: Session = Depends(get_db),
-    current_user: str = Depends(get_current_user)
+    current_user: User = Depends(get_current_user_obj)
 ):
+    inspection = db.query(Inspection).filter(Inspection.id == inspection_id).first()
+    if not inspection:
+        raise HTTPException(status_code=404, detail="Inspection not found")
+    if current_user.role != "admin" and inspection.user_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Not authorized to access this report")
+
     report = db.query(Report).filter(Report.inspection_id == inspection_id).first()
-    
+
     if not report:
         raise HTTPException(status_code=404, detail="Report not found")
     

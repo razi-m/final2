@@ -2,42 +2,58 @@ from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File,
 from sqlalchemy.orm import Session
 from typing import List
 import os
-import shutil
 import httpx
 from app.database import get_db
 from app.models import Inspection as InspectionModel, Defect as DefectModel, User as UserModel, Report as ReportModel
 from app.schemas import InspectionCreate, Inspection as InspectionSchema, InspectionDetail
-from app.auth import get_current_user
+from app.auth import get_current_user_obj, require_admin
 from app.state_machine import validate_transition
 from app.config import settings
 
 router = APIRouter()
 
+
+def _get_owned_inspection(inspection_id: int, db: Session, current_user: UserModel) -> InspectionModel:
+    """Fetch an inspection, enforcing that the caller owns it (or is an admin)."""
+    inspection = db.query(InspectionModel).filter(InspectionModel.id == inspection_id).first()
+    if not inspection:
+        raise HTTPException(status_code=404, detail="Inspection not found")
+    if current_user.role != "admin" and inspection.user_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Not authorized to access this inspection")
+    return inspection
+
 UPLOAD_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "uploads")
 os.makedirs(UPLOAD_DIR, exist_ok=True)
+
+# Only allow known-safe video container extensions for uploads.
+ALLOWED_VIDEO_EXTENSIONS = {".mp4", ".mov", ".avi", ".webm", ".mkv"}
+# Cap upload size to avoid filling the disk (500 MB).
+MAX_UPLOAD_SIZE = 500 * 1024 * 1024
 
 @router.get("/inspections", response_model=List[InspectionSchema])
 def list_inspections(
     skip: int = 0,
     limit: int = 100,
     db: Session = Depends(get_db),
-    current_user: str = Depends(get_current_user)
+    current_user: UserModel = Depends(get_current_user_obj)
 ):
-    inspections = db.query(InspectionModel).offset(skip).limit(limit).all()
+    query = db.query(InspectionModel)
+    if current_user.role != "admin":
+        query = query.filter(InspectionModel.user_id == current_user.id)
+    inspections = query.offset(skip).limit(limit).all()
     return inspections
 
 @router.post("/inspections", response_model=InspectionSchema)
 def create_inspection(
     inspection: InspectionCreate,
     db: Session = Depends(get_db),
-    current_user: str = Depends(get_current_user)
+    current_user: UserModel = Depends(get_current_user_obj)
 ):
-    user = db.query(UserModel).filter(UserModel.username == current_user).first()
     db_inspection = InspectionModel()
     db_inspection.title = inspection.title
     db_inspection.description = inspection.description
     db_inspection.status = "created"
-    db_inspection.user_id = user.id
+    db_inspection.user_id = current_user.id
     db.add(db_inspection)
     db.commit()
     db.refresh(db_inspection)
@@ -45,37 +61,59 @@ def create_inspection(
 
 @router.get("/inspections/{inspection_id}", response_model=InspectionDetail)
 def get_inspection(
-    inspection_id: int, 
+    inspection_id: int,
     db: Session = Depends(get_db),
-    current_user: str = Depends(get_current_user)
+    current_user: UserModel = Depends(get_current_user_obj)
 ):
-    inspection = db.query(InspectionModel).filter(InspectionModel.id == inspection_id).first()
-    if not inspection:
-        raise HTTPException(status_code=404, detail="Inspection not found")
-    return inspection
+    return _get_owned_inspection(inspection_id, db, current_user)
 
 @router.post("/inspections/{inspection_id}/upload")
 def upload_video(
     inspection_id: int,
     file: UploadFile = File(...),
     db: Session = Depends(get_db),
-    current_user: str = Depends(get_current_user)
+    current_user: UserModel = Depends(get_current_user_obj)
 ):
-    inspection = db.query(InspectionModel).filter(InspectionModel.id == inspection_id).first()
-    if not inspection:
-        raise HTTPException(status_code=404, detail="Inspection not found")
-    
+    inspection = _get_owned_inspection(inspection_id, db, current_user)
+
     try:
         validate_transition(inspection.status, "video_uploaded")
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
-    
-    file_extension = os.path.splitext(file.filename)[1]
+
+    # Validate the extension against an allowlist. The filename is fully
+    # attacker-controlled, so we never reuse any other part of it (avoids
+    # path traversal and arbitrary file types).
+    file_extension = os.path.splitext(file.filename or "")[1].lower()
+    if file_extension not in ALLOWED_VIDEO_EXTENSIONS:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Unsupported file type. Allowed: {sorted(ALLOWED_VIDEO_EXTENSIONS)}",
+        )
+
+    # Build the destination path from server-controlled values only, then
+    # confirm it stays inside UPLOAD_DIR as defense in depth.
     file_path = os.path.join(UPLOAD_DIR, f"inspection_{inspection_id}{file_extension}")
-    
-    with open(file_path, "wb") as buffer:
-        shutil.copyfileobj(file.file, buffer)
-    
+    if os.path.commonpath([os.path.abspath(file_path), os.path.abspath(UPLOAD_DIR)]) != os.path.abspath(UPLOAD_DIR):
+        raise HTTPException(status_code=400, detail="Invalid file path")
+
+    # Stream the upload to disk while enforcing the size cap.
+    bytes_written = 0
+    try:
+        with open(file_path, "wb") as buffer:
+            while chunk := file.file.read(1024 * 1024):
+                bytes_written += len(chunk)
+                if bytes_written > MAX_UPLOAD_SIZE:
+                    raise HTTPException(
+                        status_code=413,
+                        detail=f"File too large. Maximum size is {MAX_UPLOAD_SIZE // (1024 * 1024)} MB",
+                    )
+                buffer.write(chunk)
+    except HTTPException:
+        if os.path.exists(file_path):
+            os.remove(file_path)
+        raise
+
     inspection.video_path = file_path
     inspection.status = "video_uploaded"
     db.commit()
@@ -88,12 +126,10 @@ async def analyze_inspection(
     inspection_id: int,
     background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
-    current_user: str = Depends(get_current_user)
+    current_user: UserModel = Depends(get_current_user_obj)
 ):
-    inspection = db.query(InspectionModel).filter(InspectionModel.id == inspection_id).first()
-    if not inspection:
-        raise HTTPException(status_code=404, detail="Inspection not found")
-    
+    inspection = _get_owned_inspection(inspection_id, db, current_user)
+
     try:
         validate_transition(inspection.status, "analyzing")
     except ValueError as e:
@@ -137,12 +173,12 @@ def approve_inspection(
     inspection_id: int,
     background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
-    current_user: str = Depends(get_current_user)
+    current_user: UserModel = Depends(require_admin)
 ):
     inspection = db.query(InspectionModel).filter(InspectionModel.id == inspection_id).first()
     if not inspection:
         raise HTTPException(status_code=404, detail="Inspection not found")
-    
+
     try:
         validate_transition(inspection.status, "approved")
     except ValueError as e:
@@ -170,7 +206,7 @@ async def generate_report_task(inspection_id: int):
         defects = db.query(DefectModel).filter(DefectModel.inspection_id == inspection_id).all()
         
         genai.configure(api_key=settings.GEMINI_API_KEY)
-        model = genai.GenerativeModel('gemini-pro')
+        model = genai.GenerativeModel('gemini-1.5-flash')
         
         defect_summary = "\n".join([
             f"- {d.defect_type} detected in frame {d.frame_number} with {d.confidence:.2%} confidence"
@@ -186,6 +222,12 @@ Status: {inspection.status}
 Defects Found:
 {defect_summary}
 
+STRICT INSTRUCTIONS:
+1. Use ONLY the exact defect types provided in the input list above (pothole, crack, corrosion).
+2. Do NOT infer new structural issues or use terms like "spalling", "deformation", "settlement", or "structural damage" unless explicitly listed in Defects Found.
+3. Do NOT add engineering interpretations beyond what is supported by the data.
+4. If no defects are listed, state "No anomalies detected."
+
 Please provide:
 1. Executive Summary
 2. Detailed Findings
@@ -196,15 +238,33 @@ Please provide:
         response = model.generate_content(prompt)
         report_content = response.text
         
+        # Post-process validation: Remove forbidden terms
+        import re
+        FORBIDDEN_TERMS = [r"spalling", r"deformation", r"settlement", r"structural damage"]
+        for term in FORBIDDEN_TERMS:
+             # Remove lines containing forbidden terms (case-insensitive)
+             report_content = re.sub(f"(?i)^.*{term}.*$", "", report_content, flags=re.MULTILINE)
+        
+        # Remove empty lines resulting from deletion
+        report_content = re.sub(r"\n\s*\n", "\n\n", report_content).strip()
+        
+        # The core FPDF fonts only support latin-1, but Gemini emits UTF-8
+        # (em-dashes, smart quotes, bullets). Transliterate to a latin-1-safe
+        # form so PDF generation never crashes on those characters.
+        def _latin1(text: str) -> str:
+            return text.encode("latin-1", "replace").decode("latin-1")
+
         pdf = FPDF()
         pdf.add_page()
         pdf.set_font("Arial", "B", 16)
-        pdf.cell(0, 10, f"Inspection Report: {inspection.title}", ln=True)
+        pdf.multi_cell(0, 10, _latin1(f"Inspection Report: {inspection.title}"))
         pdf.ln(10)
-        
+
         pdf.set_font("Arial", size=12)
         for line in report_content.split('\n'):
-            pdf.cell(0, 10, line, ln=True)
+            # multi_cell wraps long lines; an empty string would error, so
+            # emit a blank spacer line instead.
+            pdf.multi_cell(0, 8, _latin1(line) if line else " ")
         
         reports_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "reports")
         os.makedirs(reports_dir, exist_ok=True)
