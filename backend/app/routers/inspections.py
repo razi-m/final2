@@ -163,6 +163,10 @@ async def analyze_inspection(
         
         return {"message": "Analysis completed", "defects_found": len(analysis_results.get("defects", []))}
     
+    except HTTPException:
+        inspection.status = "failed"
+        db.commit()
+        raise
     except Exception as e:
         inspection.status = "failed"
         db.commit()
@@ -278,6 +282,13 @@ Please provide:
         db.commit()
         
     except Exception as e:
-        print(f"Report generation failed: {e}")
+        print(f"Report generation failed for inspection {inspection_id}: {e}")
+        try:
+            inspection = db.query(InspectionModel).filter(InspectionModel.id == inspection_id).first()
+            if inspection:
+                inspection.status = "failed"
+                db.commit()
+        except Exception:
+            pass
     finally:
         db.close()

@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
-import { DEFAULT_USERS, ROLES } from '../utils/constants';
+import api from '../api/client';
 
 const AuthContext = createContext(null);
 
@@ -25,63 +25,40 @@ export const AuthProvider = ({ children }) => {
       localStorage.setItem('ariados_user', JSON.stringify(user));
     } else {
       localStorage.removeItem('ariados_user');
+      localStorage.removeItem('token');
     }
   }, [user]);
 
-  const login = useCallback(async (username, password, role) => {
+  const login = useCallback(async (username, password) => {
     setLoading(true);
-    // Simulate network delay
-    await new Promise(r => setTimeout(r, 800));
+    try {
+      const { data } = await api.post('/login', { username, password });
+      localStorage.setItem('token', data.access_token);
 
-    const found = DEFAULT_USERS.find(
-      u => u.username === username && u.password === password
-    );
-
-    if (found) {
       const userData = {
-        id: found.id,
-        username: found.username,
-        email: found.email,
-        role: role || found.role,
+        username,
+        role: data.role || 'inspector',
         lastLogin: new Date().toISOString(),
       };
       setUser(userData);
-      setLoading(false);
       return { success: true, user: userData };
+    } catch (err) {
+      const detail = err.response?.data?.detail || 'Login failed';
+      return { success: false, error: detail };
+    } finally {
+      setLoading(false);
     }
-
-    // Allow any username/password for demo
-    const userData = {
-      id: Date.now(),
-      username,
-      email: `${username}@ariados.com`,
-      role: role || ROLES.INSPECTOR,
-      lastLogin: new Date().toISOString(),
-    };
-    setUser(userData);
-    setLoading(false);
-    return { success: true, user: userData };
   }, []);
 
   const logout = useCallback(() => {
     setUser(null);
-    localStorage.removeItem('ariados_user');
   }, []);
 
-  const isAdmin = user?.role === ROLES.ADMIN;
+  const isAdmin = user?.role === 'admin';
   const isAuthenticated = !!user;
 
-  const value = {
-    user,
-    loading,
-    login,
-    logout,
-    isAdmin,
-    isAuthenticated,
-  };
-
   return (
-    <AuthContext.Provider value={value}>
+    <AuthContext.Provider value={{ user, loading, login, logout, isAdmin, isAuthenticated }}>
       {children}
     </AuthContext.Provider>
   );

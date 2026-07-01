@@ -19,14 +19,14 @@ const LoginPage = memo(() => {
     setError('');
     setLoading(true);
     try {
-      const success = login(username, password);
-      if (success) {
+      const result = await login(username, password);
+      if (result.success) {
         navigate('/dashboard');
       } else {
-        setError('Invalid credentials. Try admin / admin123');
+        setError(result.error || 'Invalid credentials');
       }
     } catch {
-      setError('Login failed');
+      setError('Login failed. Please try again.');
     }
     setLoading(false);
   };
@@ -108,7 +108,7 @@ const LoginPage = memo(() => {
 
           <div className="mt-6 pt-4 border-t border-gray-100">
             <p className="text-xs text-gray-400 text-center">
-              Demo: <code className="bg-gray-100 px-1.5 py-0.5 rounded text-gray-600">admin / admin123</code>
+              Contact your administrator for access credentials.
             </p>
           </div>
         </div>
