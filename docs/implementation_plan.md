@@ -134,7 +134,7 @@ HackSav/
 #### [NEW] [.env](file:///c:/Users/Razi/Documents/HackSav/.env)
 
 Secrets file — **never committed**:
-- `DATABASE_URL=postgresql://postgres:REDACTED_DB_PASSWORD@localhost:5432/razidb`
+- `DATABASE_URL=postgresql://postgres:<password>@localhost:5432/razidb`
 - `GEMINI_API_KEY=<loaded from env only>`
 - `JWT_SECRET=<random secret>`
 - `ML_SERVICE_URL=http://localhost:8001`
