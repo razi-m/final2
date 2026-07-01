@@ -2,6 +2,7 @@
 """
 Test script to verify all HackSav features are working
 """
+import os
 import requests
 import json
 import time
@@ -25,8 +26,8 @@ def test_login():
     """Test login functionality"""
     print("\nTesting Login...")
     r = requests.post(f"{BASE_URL}/api/login", json={
-        "username": "admin",
-        "password": "admin123"
+        "username": os.getenv("ADMIN_USERNAME", "admin"),
+        "password": os.getenv("ADMIN_PASSWORD", ""),
     })
     assert r.status_code == 200
     data = r.json()
@@ -113,7 +114,7 @@ def run_all_tests():
         print("="*50)
         print("\nYour HackSav system is fully operational!")
         print("You can now:")
-        print("  1. Login with admin/admin123")
+        print("  1. Login with your ADMIN_USERNAME/ADMIN_PASSWORD")
         print("  2. Create inspections")
         print("  3. Upload videos")
         print("  4. Run AI analysis")

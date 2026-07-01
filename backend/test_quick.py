@@ -1,3 +1,4 @@
+import os
 from fastapi.testclient import TestClient
 from app.main import app
 
@@ -7,8 +8,8 @@ print("Testing inspection creation...")
 
 # Login
 response = client.post("/api/login", json={
-    "username": "admin",
-    "password": "admin123"
+    "username": os.getenv("ADMIN_USERNAME", "admin"),
+    "password": os.getenv("ADMIN_PASSWORD", ""),
 })
 print(f"Login: {response.status_code}")
 token = response.json()["access_token"]

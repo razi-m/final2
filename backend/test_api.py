@@ -1,3 +1,4 @@
+import os
 from fastapi.testclient import TestClient
 from app.main import app
 
@@ -5,8 +6,8 @@ client = TestClient(app)
 
 def test_login():
     response = client.post("/api/login", json={
-        "username": "admin",
-        "password": "admin123"
+        "username": os.getenv("ADMIN_USERNAME", "admin"),
+        "password": os.getenv("ADMIN_PASSWORD", ""),
     })
     assert response.status_code == 200
     data = response.json()
